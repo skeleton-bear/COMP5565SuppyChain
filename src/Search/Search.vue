@@ -506,6 +506,7 @@
               throw new Error("Failed to switch to the local network");
             }
           }
+          
 
           const provider = new ethers.providers.Web3Provider(window.ethereum);
           await provider.send("eth_requestAccounts", []); // 请求用户授权
@@ -540,7 +541,7 @@
           console.log("Contract initialized successfully");
 
         } catch (error) {
-          console.error("Detailed contract initialization error:", error);
+          console.error("Contract initialization error:", error);
           alert(`Contract initialization failed: ${error.message}`);
           throw error;
         }
@@ -561,72 +562,92 @@
             await this.initContract();
           }
 
+          // 首先检查代币是否存在
+          try {
+            await this.contract.ownerOf(this.tokenId);
+          } catch (error) {
+            console.error("Token does not exist:", error);
+            this.diamond = null;
+            alert("该代币ID不存在");
+            return;
+          }
+
           // 获取所有阶段的详细信息
-          const miningDetails = await this.contract.getMiningDetails(this.tokenId);
-          const cuttingDetails = await this.contract.getCuttingDetails(this.tokenId);
-          const gradingDetails = await this.contract.getGradingDetails(this.tokenId);
-          const jewelryDetails = await this.contract.getJewelryDetails(this.tokenId);
-          const designDetails = await this.contract.getDesignDetails(this.tokenId);
-          const customerDetails = await this.contract.getCustomerDetails(this.tokenId);
-          const position = await this.contract.getDiamondPosition(this.tokenId);
-          const owner = await this.contract.ownerOf(this.tokenId);
+          try {
+            const [miningDetails, cuttingDetails, gradingDetails, jewelryDetails, designDetails, customerDetails, position, owner] = 
+              await Promise.all([
+                this.contract.getMiningDetails(this.tokenId),
+                this.contract.getCuttingDetails(this.tokenId),
+                this.contract.getGradingDetails(this.tokenId),
+                this.contract.getJewelryDetails(this.tokenId),
+                this.contract.getDesignDetails(this.tokenId),
+                this.contract.getCustomerDetails(this.tokenId),
+                this.contract.getDiamondPosition(this.tokenId),
+                this.contract.ownerOf(this.tokenId)
+              ]);
 
-          // const diamondID = await this.contract.diamondID(this.tokenId);
-          
-          // // 从合约获取客户信息
-          // const customer = await this.contract.customer(this.tokenId);
-          // const customerPurchaseDate = await this.contract.possessionDate(this.tokenId);
+            console.log("Raw Mining Details:", miningDetails);
+            console.log("Raw Cutting Details:", cuttingDetails);
+            console.log("Raw Grading Details:", gradingDetails);
+            console.log("Raw Jewelry Details:", jewelryDetails);
+            console.log("Raw Design Details:", designDetails);
+            console.log("Raw Customer Details:", customerDetails);
 
-          // console.log("Basic Details:", basicDetails); // 添加日志
-          console.log("Mining Details:", miningDetails);
-          console.log("Cutting Details:", cuttingDetails);
-          console.log("Current Token ID:", this.tokenId); // 添加日志
+            // 确保所有数据都存在并且格式正确
+            if (!miningDetails || !cuttingDetails || !gradingDetails || 
+                !jewelryDetails || !designDetails || !customerDetails) {
+              throw new Error("Some data is missing from the contract");
+            }
 
+            // 修改数据结构组织方式，添加数据验证
+            this.diamond = {
+              Mining: {
+                diamondID: this.tokenId,
+                miningCompany: miningDetails[0] ? this.bytesToString(miningDetails[0]) : 'N/A',
+                location: miningDetails[1] ? this.bytesToString(miningDetails[1]) : 'N/A',
+                minedDate: miningDetails[2] ? miningDetails[2].toNumber() : 0,
+                miningAddress: this.isZeroAddress(miningDetails[3]) ? 'N/A' : miningDetails[3]
+              },
+              Cutting: {
+                cuttingCompany: cuttingDetails[0] ? this.bytesToString(cuttingDetails[0]) : 'N/A',
+                cutDate: cuttingDetails[1] ? cuttingDetails[1].toNumber() : 0,
+                cutGrade: cuttingDetails[2] ? this.bytesToString(cuttingDetails[2]) : 'N/A',
+                cuttingAddress: this.isZeroAddress(cuttingDetails[3]) ? 'N/A' : cuttingDetails[3]
+              },
+              grading: {
+                gradingLab: gradingDetails[0] ? this.bytesToString(gradingDetails[0]) : 'N/A',
+                engravedID: gradingDetails[1] ? this.bytesToString(gradingDetails[1]) : 'N/A',
+                grading: gradingDetails[2] ? this.bytesToString(gradingDetails[2]) : 'N/A',
+                gradingDate: gradingDetails[3] ? gradingDetails[3].toNumber() : 0,
+                qualityReport: gradingDetails[4] || 'N/A',
+                gradingAddress: this.isZeroAddress(gradingDetails[5]) ? 'N/A' : gradingDetails[5]
+              },
+              jewelry: {
+                jewelryMaker: jewelryDetails[0] ? this.bytesToString(jewelryDetails[0]) : 'N/A',
+                jewelryType: jewelryDetails[1] ? this.bytesToString(jewelryDetails[1]) : 'N/A',
+                possessionDate: jewelryDetails[2] ? jewelryDetails[2].toNumber() : 0,
+                jewelryAddress: this.isZeroAddress(jewelryDetails[3]) ? 'N/A' : jewelryDetails[3]
+              },
+              design: {
+                designer: designDetails[0] ? this.bytesToString(designDetails[0]) : 'N/A',
+                designDate: designDetails[1] ? designDetails[1].toNumber() : 0,
+                designerAddress: this.isZeroAddress(designDetails[2]) ? 'N/A' : designDetails[2]
+              },
+              customer: {
+                name: customerDetails[0] ? this.bytesToString(customerDetails[0]) : 'N/A',
+                purchaseDate: customerDetails[1] ? customerDetails[1].toNumber() : 0,
+                customerAddress: this.isZeroAddress(customerDetails[2]) ? 'N/A' : customerDetails[2]
+              },
+              position: position.toNumber(),
+              owner: owner
+            };
 
-          // 修改数据结构组织方式
-          this.diamond = {
-            Mining: {
-              diamondID: String(this.tokenId),
-              miningCompany: ethers.utils.parseBytes32String(miningDetails[0]),
-              location: ethers.utils.parseBytes32String(miningDetails[1]),
-              minedDate: miningDetails[2].toNumber(),
-              miningAddress: miningDetails[3]
-            },
-            Cutting:{
-              cuttingCompany: ethers.utils.parseBytes32String(cuttingDetails[0]),
-              cutDate: cuttingDetails[1].toNumber(),
-              grade: ethers.utils.parseBytes32String(cuttingDetails[2]),
-              cuttingAddress: cuttingDetails[3]
-            },
-            grading: {
-              gradingLab: ethers.utils.parseBytes32String(gradingDetails[0]),
-              engravedID: ethers.utils.parseBytes32String(gradingDetails[1]),
-              grading: ethers.utils.parseBytes32String(gradingDetails[2]),
-              gradingDate: gradingDetails[3].toNumber(),
-              qualityReport: gradingDetails[4],  // 这个保持 string
-              gradingAddress: gradingDetails[5]
-            },
-            jewelry: {
-              jewelryMaker: ethers.utils.parseBytes32String(jewelryDetails[0]),
-              jewelryType: ethers.utils.parseBytes32String(jewelryDetails[1]),
-              possessionDate: jewelryDetails[2].toNumber(),
-              jewelryAddress: jewelryDetails[3]
-            },
-            design: {
-              designer: ethers.utils.parseBytes32String(designDetails[0]),
-              designDate: designDetails[1].toNumber(),
-              designerAddress: designDetails[2]
-            },
-            customer: {
-              name: ethers.utils.parseBytes32String(customerDetails[0]),
-              purchaseDate: customerDetails[1].toNumber(),
-              customerAddress: customerDetails[2]
-            },
-            position: position.toNumber(),
-            owner: owner
-          };
+            console.log("Processed Diamond Data:", this.diamond);
 
-          console.log("Diamond Data:", this.diamond);
+          } catch (error) {
+            console.error("Error processing diamond details:", error);
+            throw new Error("Failed to process diamond details");
+          }
 
         } catch (error) {
           console.error("Error fetching diamond details:", error);
@@ -638,11 +659,13 @@
         const stages = ["Mining", "Cutting", "Grading", "Jewelry Making", "Design", "Customer"];
         return position >= 5 ? "Customer" : stages[position] || "Unknown";
       },
-      // 添加检查数据有效性的方法
+      // 修改 isValidDiamondData 方法
       isValidDiamondData(data) {
-        return data.Mining.miningCompany !== '' || 
-               data.Mining.location !== '' || 
-               data.Mining.minedDate !== 0;
+        return data && 
+               data.Mining && 
+               (data.Mining.miningCompany !== 'N/A' || 
+                data.Mining.location !== 'N/A' || 
+                data.Mining.minedDate !== 0);
       },
       showMiningDialog() {
         this.showMiningForm = true;
@@ -702,14 +725,22 @@
           const gradeBytes32 = ethers.utils.formatBytes32String(this.cuttingForm.grade);
           const cutDateTimestamp = Math.floor(new Date(this.cuttingForm.cutDate).getTime() / 1000);
 
+          console.log("Cutting parameters:", {
+            tokenId: this.cuttingForm.tokenId,
+            company: cuttingCompanyBytes32,
+            date: cutDateTimestamp,
+            grade: gradeBytes32
+          });
+
           const tx = await this.contract.cutting(
             this.cuttingForm.tokenId,
-            cuttingCompanyBytes32,  // 使用转换后的 bytes32
+            cuttingCompanyBytes32,
             cutDateTimestamp,
-            gradeBytes32           // 使用转换后的 bytes32
+            gradeBytes32,
+            { gasLimit: 500000 }
           );
 
-          console.log("Waiting for transaction confirmation...");
+          console.log("Transaction sent:", tx.hash);
           const receipt = await tx.wait();
           console.log("Transaction confirmed:", receipt);
 
@@ -717,6 +748,7 @@
           this.showCuttingForm = false;
           this.cuttingForm = { tokenId: '', cuttingCompany: '', cutDate: '', grade: '' };
           await this.fetchMyNFTs();
+
         } catch (error) {
           console.error('Error submitting cutting info:', error);
           alert(`Failed to submit cutting info: ${error.message}`);
@@ -844,22 +876,18 @@
             const tokenId = await this.contract.tokenOfOwnerByIndex(this.account, i);
             const miningDetails = await this.contract.getMiningDetails(tokenId);
             const cuttingDetails = await this.contract.getCuttingDetails(tokenId);
-            // const gradingDetails = await this.contract.getGradingDetails(tokenId);
-            // const jewelryDetails = await this.contract.getJewelryDetails(tokenId);
-            // const designDetails = await this.contract.getDesignDetails(tokenId);
-            // const customerDetails = await this.contract.getCustomerDetails(tokenId);
             const position = await this.contract.getDiamondPosition(tokenId);
             const owner = await this.contract.ownerOf(tokenId);
 
             this.myNFTs.push({
               tokenId: tokenId.toString(),
               diamondID: miningDetails[4],
-              miningCompany: miningDetails[0],
-              location: miningDetails[1],
+              miningCompany: this.bytesToString(miningDetails[0]),
+              location: this.bytesToString(miningDetails[1]),
               minedDate: this.formatDate(miningDetails[2].toNumber()),
-              cuttingCompany: cuttingDetails[0],
+              cuttingCompany: this.bytesToString(cuttingDetails[0]),
               cutDate: this.formatDate(cuttingDetails[1].toNumber()),
-              grade: cuttingDetails[2],
+              grade: this.bytesToString(cuttingDetails[2]),
               position: position.toNumber(),
               owner: owner
             });
@@ -869,9 +897,15 @@
           alert('Failed to fetch your NFTs');
         }
       },
+      // 修改 formatDate 方法
       formatDate(timestamp) {
-        if (!timestamp) return 'N/A';
-        return new Date(timestamp * 1000).toLocaleDateString();
+        if (!timestamp || timestamp === 0) return 'N/A';
+        try {
+          return new Date(timestamp * 1000).toLocaleDateString();
+        } catch (error) {
+          console.warn('格式化日期时出错:', error);
+          return 'N/A';
+        }
       },
 
       // 提交铸造信息
@@ -881,6 +915,12 @@
             await this.initContract();
           }
 
+          // 检查输入值是否为空
+          if (!this.miningForm.miningCompany || !this.miningForm.location || !this.miningForm.date) {
+            alert("请填写所有必填字段");
+            return;
+          }
+
           // 将字符串转换为 bytes32 格式
           const miningCompanyBytes32 = ethers.utils.formatBytes32String(this.miningForm.miningCompany);
           const locationBytes32 = ethers.utils.formatBytes32String(this.miningForm.location);
@@ -888,21 +928,21 @@
           // 转换日期为时间戳
           const dateTimestamp = Math.floor(new Date(this.miningForm.date).getTime() / 1000);
 
-          console.log("Mining with params:", {
+          console.log("Mining parameters:", {
             company: miningCompanyBytes32,
             location: locationBytes32,
             date: dateTimestamp
           });
 
-          // 调用合约 mining 方法，使用转换后的 bytes32 数据
+          // 调用合约方法
           const tx = await this.contract.mining(
             miningCompanyBytes32,
             locationBytes32,
-            dateTimestamp
+            dateTimestamp,
+            // { gasLimit: 500000 } // 添加 gas 限制
           );
 
-          // 等待交易被确认
-          console.log("Waiting for transaction confirmation...");
+          console.log("Transaction sent:", tx.hash);
           const receipt = await tx.wait();
           console.log("Transaction confirmed:", receipt);
 
@@ -927,28 +967,65 @@
           alert(`Failed to mint diamond: ${error.message}`);
         }
       },
+      //转移NFT操作
       async submitTransfer() {
         try {
           if (!this.contract) {
             await this.initContract();
           }
 
+          // 检查地址格式
+          if (!ethers.utils.isAddress(this.transferForm.to)) {
+            alert("请输入有效的以太坊地址");
+            return;
+          }
+
+          // 检查是否是当前 NFT 的所有者
+          try {
+            const owner = await this.contract.ownerOf(this.transferForm.tokenId);
+            if (owner.toLowerCase() !== this.account.toLowerCase()) {
+              alert("你不是这个钻石 NFT 的所有者，无法进行转移操作");
+              return;
+            }
+          } catch (error) {
+            console.error("Error checking ownership:", error);
+            alert("检查所有权时出错");
+            return;
+          }
+
+          console.log("Transfer parameters:", {
+            tokenId: this.transferForm.tokenId,
+            to: this.transferForm.to
+          });
+
           const tx = await this.contract.transit(
             this.transferForm.tokenId,
-            this.transferForm.to,
-            // { gasLimit: 300000 }
+            this.transferForm.to
           );
 
-          await tx.wait();
+          console.log("Transaction sent:", tx.hash);
+          const receipt = await tx.wait();
+          console.log("Transaction confirmed:", receipt);
+
           alert('NFT transferred successfully!');
           this.showTransferForm = false;
           this.transferForm = { tokenId: '', to: '' };
           await this.fetchMyNFTs();
+
         } catch (error) {
           console.error('Error transferring NFT:', error);
-          alert(`Failed to transfer NFT: ${error.message}`);
+          
+          // 处理特定的错误信息
+          if (error.message.includes("You don't own the diamond now")) {
+            alert("You don't own the diamond now");
+          } else if (error.message.includes("cannot estimate gas")) {
+            alert("The transaction may fail, please check if you are the owner of the NFT");
+          } else {
+            alert(`Failed to transfer NFT: ${error.message}`);
+          }
         }
       },
+
       // 检查是否是原始所有者（铸造者）
       async isOriginalOwner(tokenId) {
         try {
@@ -961,8 +1038,13 @@
         }
       },
 
-      // 检查阶段
+      // 修改 getStageStatus 方法
       getStageStatus(position, stage, data) {
+        // 首先检查 data 是否存在
+        if (!data) {
+          return 'Unknown';
+        }
+
         // 如果是客户阶段（stage 5）且当前位置大于等于5
         if (stage === 5 && position >= 5) {
           return 'In Progress';
@@ -975,20 +1057,32 @@
 
         // 如果当前位置大于该阶段，说明该阶段已完成
         if (position > stage) {
-          // 检查该阶段是否完成
+          // 检查该阶段是否有数据
           switch(stage) {
             case 0: // Mining
-              return data.basic.miningCompany ? 'Completed' : 'Incomplete';
+              return data.Mining && data.Mining.miningCompany && data.Mining.miningCompany !== 'N/A' 
+                ? 'Completed' 
+                : 'Incomplete';
             case 1: // Cutting
-              return data.basic.cuttingCompany ? 'Completed' : 'Incomplete';
+              return data.Cutting && data.Cutting.cuttingCompany && data.Cutting.cuttingCompany !== 'N/A' 
+                ? 'Completed' 
+                : 'Incomplete';
             case 2: // Grading
-              return data.grading.gradingLab ? 'Completed' : 'Incomplete';
+              return data.grading && data.grading.gradingLab && data.grading.gradingLab !== 'N/A' 
+                ? 'Completed' 
+                : 'Incomplete';
             case 3: // Jewelry
-              return data.jewelry.jewelryMaker ? 'Completed' : 'Incomplete';
+              return data.jewelry && data.jewelry.jewelryMaker && data.jewelry.jewelryMaker !== 'N/A' 
+                ? 'Completed' 
+                : 'Incomplete';
             case 4: // Design
-              return data.design.designer ? 'Completed' : 'Incomplete';
+              return data.design && data.design.designer && data.design.designer !== 'N/A' 
+                ? 'Completed' 
+                : 'Incomplete';
             case 5: // Customer
-              return data.customer.name ? 'Completed' : 'Incomplete';
+              return data.customer && data.customer.name && data.customer.name !== 'N/A' 
+                ? 'Completed' 
+                : 'Incomplete';
             default:
               return 'Unknown';
           }
@@ -1120,6 +1214,21 @@
         this.showMyNFTsDialog = false;
         this.customerForm.tokenId = tokenId;
         this.showCustomerForm = true;
+      },
+      // 修改 bytesToString 方法
+      bytesToString(bytes32) {
+        if (!bytes32) return 'N/A';
+        try {
+          const string = ethers.utils.parseBytes32String(bytes32);
+          return string === '' ? 'N/A' : string;
+        } catch (error) {
+          console.warn('Error parsing bytes32 to string:', error);
+          return 'Invalid Data';
+        }
+      },
+      // 添加检查零地址的辅助方法
+      isZeroAddress(address) {
+        return !address || address === '0x0000000000000000000000000000000000000000';
       }
     },
     beforeUnmount() {

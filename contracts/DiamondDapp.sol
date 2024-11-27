@@ -7,7 +7,7 @@ contract DiomandDapp is ERC721Enumerable {
     uint256 public tokenIds;
 
     // 每个阶段的相关信息
-    mapping(uint256 => bytes32) public diamondID;
+    mapping(uint256 => uint256) public diamondID;
     mapping(uint256 => uint256) public position; // 0: 采矿, 1: 切割, 2: 评级, 3: 珠宝商，4: 设计，5：客户
     // 采矿阶段
     mapping(uint256 => bytes32) public miningCompany;
@@ -172,7 +172,7 @@ contract DiomandDapp is ERC721Enumerable {
         bytes32 _location,
         uint256 _minedDate,
         address _miningAddress,
-        bytes32 _diamondID
+        uint256 _diamondID
     ) {
         return (
             miningCompany[token_id],
