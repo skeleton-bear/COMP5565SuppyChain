@@ -1,1495 +1,510 @@
 <template>
-    <div class="search">
-      <h1>Diamond NFT System</h1>
-      
-      <div v-if="!isConnected" class="connect-wallet">
-        <p>Please connect your wallet first</p>
-        <button @click="connectWallet">Connect MetaMask</button>
+  <div class="search">
+    <h1>Diamond NFT System</h1>
+    
+    <!-- 钱包连接组件 -->
+    <ConnectWallet 
+      @connected="handleWalletConnected"
+      @disconnected="handleWalletDisconnected"
+    />
+
+    <div v-if="isConnected">
+      <div class="action-buttons">
+        <button @click="showMiningDialog" class="action-btn">Mint New Diamond</button>
+        <button @click="showMyNFTs" class="my-nfts-btn">My NFTs</button>
       </div>
 
-      <div v-else>
-        <p>Wallet Connected: {{ account }}</p>
-        
-        <div class="action-buttons">
-          <button @click="showMiningDialog" class="action-btn">Mint New Diamond</button>
-          <button @click="showMyNFTs" class="my-nfts-btn">My NFTs</button>
-        </div>
+      <!-- 搜索组件 -->
+      <SearchForm 
+        :isConnected="isConnected"
+        @search="handleSearch"
+      />
 
-        <div class="search-section">
-          <input
-            v-model="tokenId"
-            type="number"
-            placeholder="Enter Token ID"
-            @keyup.enter="searchDiamond"
-          />
-          <button @click="searchDiamond">Search</button>
-        </div>
+      <!-- 钻石详情组件 -->
+      <DiamondDetails 
+        v-if="diamond"
+        :diamond="diamond"
+        :tokenId="tokenId"
+      />
 
-        <div v-if="diamond && isValidDiamondData(diamond)">
-          <h2>Mining Stage</h2>
-          <ul>
-            <li><strong>Diamond ID:</strong> {{ String(diamond.Mining.diamondID) }}</li>
-            <li><strong>Mining Company:</strong> {{ diamond.Mining.miningCompany || 'N/A' }}</li>
-            <li><strong>Mining Company Address:</strong> {{ diamond.Mining.miningAddress || 'N/A' }}</li>
-            <li><strong>Location:</strong> {{ diamond.Mining.location || 'N/A' }}</li>
-            <li><strong>Mined Date:</strong> {{ formatDate(diamond.Mining.minedDate) }}</li>
-            <li><strong>Stage Status:</strong> {{ getStageStatus(diamond.position, 0, diamond) }}</li>
-          </ul>
+      <!-- 各种表单组件 -->
+      <MiningForm 
+        v-if="showMiningForm"
+        @close="showMiningForm = false"
+        @success="handleMiningSuccess"
+      />
 
-          <h2>Cutting Stage</h2>
-          <ul>
-            <li><strong>Cutting Company:</strong> {{ diamond.Cutting.cuttingCompany || 'N/A' }}</li>
-            <li><strong>Cutting Company Address:</strong> {{ diamond.Cutting.cuttingAddress || 'N/A' }}</li>
-            <li><strong>Cut Date:</strong> {{ formatDate(diamond.Cutting.cutDate) }}</li>
-            <li><strong>Cut Grade:</strong> {{ diamond.Cutting.cutGrade || 'N/A' }}</li>
-            <li><strong>Stage Status:</strong> {{ getStageStatus(diamond.position, 1, diamond) }}</li>
-          </ul>
+      <CuttingForm 
+        v-if="showCuttingForm"
+        :tokenId="selectedTokenId"
+        @close="closeForm"
+        @success="handleCuttingSuccess"
+      />
 
-          <h2>Grading Stage</h2>
-          <ul>
-            <li><strong>Grading Lab:</strong> {{ diamond.grading.gradingLab || 'N/A' }}</li>
-            <li><strong>Grading Lab Address:</strong> {{ diamond.grading.gradingAddress || 'N/A' }}</li>
-            <li><strong>Engraved ID:</strong> {{ diamond.grading.engravedID || 'N/A' }}</li>
-            <li><strong>Grading Level:</strong> {{ diamond.grading.grading || 'N/A' }}</li>
-            <li><strong>Grading Date:</strong> {{ formatDate(diamond.grading.gradingDate) }}</li>
-            <li><strong>Quality Report:</strong> {{ diamond.grading.qualityReport || 'N/A' }}</li>
-            <li><strong>Stage Status:</strong> {{ getStageStatus(diamond.position, 2, diamond) }}</li>
-          </ul>
+      <GradingForm 
+        v-if="showGradingForm"
+        :tokenId="selectedTokenId"
+        @close="closeForm"
+        @success="handleGradingSuccess"
+      />
 
-          <h2>Jewelry Making Stage</h2>
-          <ul>
-            <li><strong>Jewelry Maker:</strong> {{ diamond.jewelry.jewelryMaker || 'N/A' }}</li>
-            <li><strong>Jewelry Maker Address:</strong> {{ diamond.jewelry.jewelryAddress || 'N/A' }}</li>
-            <li><strong>Jewelry Type:</strong> {{ diamond.jewelry.jewelryType || 'N/A' }}</li>
-            <li><strong>Possession Date:</strong> {{ formatDate(diamond.jewelry.possessionDate) }}</li>
-            <li><strong>Stage Status:</strong> {{ getStageStatus(diamond.position, 3, diamond) }}</li>
-          </ul>
+      <JewelryForm 
+        v-if="showJewelryForm"
+        :tokenId="selectedTokenId"
+        @close="closeForm"
+        @success="handleJewelrySuccess"
+      />
 
-          <h2>Design Stage</h2>
-          <ul>
-            <li><strong>Designer:</strong> {{ diamond.design.designer || 'N/A' }}</li>
-            <li><strong>Designer Address:</strong> {{ diamond.design.designerAddress || 'N/A' }}</li>
-            <li><strong>Design Date:</strong> {{ formatDate(diamond.design.designDate) }}</li>
-            <li><strong>Stage Status:</strong> {{ getStageStatus(diamond.position, 4, diamond) }}</li>
-          </ul>
+      <DesignerForm 
+        v-if="showDesignerForm"
+        :tokenId="selectedTokenId"
+        @close="closeForm"
+        @success="handleDesignerSuccess"
+      />
 
-          <h2>Customer Stage</h2>
-          <ul>
-            <li><strong>Customer Name:</strong> {{ diamond.customer.name || 'N/A' }}</li>
-            <li><strong>Customer Address:</strong> {{ diamond.customer.customerAddress || 'N/A' }}</li>
-            <li><strong>Purchase Date:</strong> {{ formatDate(diamond.customer.purchaseDate) }}</li>
-            <li><strong>Stage Status:</strong> {{ getStageStatus(diamond.position, 5, diamond) }}</li>
-          </ul>
+      <CustomerForm 
+        v-if="showCustomerForm"
+        :tokenId="selectedTokenId"
+        @close="closeForm"
+        @success="handleCustomerSuccess"
+      />
 
-          <h2>Ownership Information</h2>
-          <ul>
-            <li><strong>Current Stage:</strong> {{ getPosition(diamond.position) }}</li>
-            <li><strong>Current Owner:</strong> {{ diamond.owner }}</li>
-          </ul>
-        </div>
-        <div v-else-if="diamond && !isValidDiamondData(diamond)" class="error-message">
-          <p>Token ID {{ tokenId }} does not exist</p>
-        </div>
+      <!-- 添加 TransferForm 组件 -->
+      <TransferForm 
+        v-if="showTransferForm"
+        :tokenId="selectedTokenId"
+        @close="showTransferForm = false"
+        @success="handleTransferSuccess"
+      />
 
-        <div v-if="showMiningForm" class="modal">
-          <div class="modal-content">
-            <span class="close" @click="showMiningForm = false">&times;</span>
-            <h2>Mining Stage</h2>
-            <form @submit.prevent="mintDiamond">
-              <div class="form-group">
-                <label>Mining Company:</label>
-                <input v-model="miningForm.miningCompany" required />
-              </div>
-              <div class="form-group">
-                <label>Location:</label>
-                <input v-model="miningForm.location" required />
-              </div>
-              <div class="form-group">
-                <label>Mining Date:</label>
-                <input type="date" v-model="miningForm.date" required />
-              </div>
-              <button type="submit">Submit Mining Info</button>
-            </form>
-          </div>
-        </div>
-
-        <div v-if="showCuttingForm" class="modal">
-          <div class="modal-content">
-            <span class="close" @click="closeForm">&times;</span>
-            <h2>Cutting Stage</h2>
-            <form @submit.prevent="submitCutting">
-              <div class="form-group">
-                <label>Token ID:</label>
-                <input type="number" v-model="cuttingForm.tokenId" disabled />
-              </div>
-              <div class="form-group">
-                <label>Cutting Company:</label>
-                <input v-model="cuttingForm.cuttingCompany" required />
-              </div>
-              <div class="form-group">
-                <label>Cut Date:</label>
-                <input type="date" v-model="cuttingForm.cutDate" required />
-              </div>
-              <div class="form-group">
-                <label>Cut Grade:</label>
-                <input v-model="cuttingForm.grade" required />
-              </div>
-              <button type="submit">Submit Cutting Info</button>
-            </form>
-          </div>
-        </div>
-
-        <div v-if="showGradingForm" class="modal">
-          <div class="modal-content">
-            <span class="close" @click="closeForm">&times;</span>
-            <h2>Grading Stage</h2>
-            <form @submit.prevent="submitGrading">
-              <div class="form-group">
-                <label>Token ID:</label>
-                <input type="number" v-model="gradingForm.tokenId" required />
-              </div>
-              <div class="form-group">
-                <label>Grading Lab:</label>
-                <input v-model="gradingForm.gradingLab" required />
-              </div>
-              <div class="form-group">
-                <label>Engraved ID:</label>
-                <input v-model="gradingForm.engravedID" required />
-              </div>
-              <div class="form-group">
-                <label>Grading Level:</label>
-                <input v-model="gradingForm.gradingLevel" required />
-              </div>
-              <div class="form-group">
-                <label>Grading Date:</label>
-                <input type="date" v-model="gradingForm.gradingDate" required />
-              </div>
-              <div class="form-group">
-                <label>Quality Report:</label>
-                <input v-model="gradingForm.qualityReport" required />
-              </div>
-              <button type="submit">Submit Grading Info</button>
-            </form>
-          </div>
-        </div>
-
-        <div v-if="showJewelryForm" class="modal">
-          <div class="modal-content">
-            <span class="close" @click="closeForm">&times;</span>
-            <h2>Jewelry Making Stage</h2>
-            <form @submit.prevent="submitJewelry">
-              <div class="form-group">
-                <label>Token ID:</label>
-                <input type="number" v-model="jewelryForm.tokenId" required />
-              </div>
-              <div class="form-group">
-                <label>Jewelry Maker:</label>
-                <input v-model="jewelryForm.jewelryMaker" required />
-              </div>
-              <div class="form-group">
-                <label>Jewelry Type:</label>
-                <input v-model="jewelryForm.jewelryType" required />
-              </div>
-              <div class="form-group">
-                <label>Possession Date:</label>
-                <input type="date" v-model="jewelryForm.possessionDate" required />
-              </div>
-              <button type="submit">Submit Jewelry Info</button>
-            </form>
-          </div>
-        </div>
-
-        <div v-if="showMyNFTsDialog" class="modal">
-          <div class="modal-content">
-            <span class="close" @click="showMyNFTsDialog = false">&times;</span>
-            <h2>My Diamond NFTs</h2>
-            <div v-if="myNFTs.length > 0">
-              <div v-for="nft in myNFTs" :key="nft.tokenId" class="nft-item">
-                <h3>Token ID: {{ nft.tokenId }}</h3>
-                <p>Diamond ID: {{ nft.diamondID }}</p>
-                <p>Mining Company: {{ nft.miningCompany }}</p>
-                <p>Location: {{ nft.location }}</p>
-                <p>Mined Date: {{ nft.minedDate }}</p>
-                <p>Current Stage: {{ getPosition(nft.position) }}</p>
-                
-                <div class="nft-actions">
-                  <template v-if="nft.owner.toLowerCase() === account.toLowerCase()">
-                    <button v-if="nft.position === 0" 
-                            @click="showTransferDialog(nft.tokenId)" 
-                            class="transfer-btn">
-                      Transfer to Cutting Company
-                    </button>
-                    
-                    <template v-if="nft.position === 1">
-                      <button @click="showCuttingDialog(nft.tokenId)" 
-                              class="action-btn">
-                        Fill Cutting Info
-                      </button>
-                      <button @click="showTransferDialog(nft.tokenId)" 
-                              class="transfer-btn">
-                        Transfer to Grading Company
-                      </button>
-                    </template>
-                    
-                    <template v-if="nft.position === 2">
-                      <button @click="showGradingDialog(nft.tokenId)" 
-                              class="action-btn">
-                        Fill Grading Info
-                      </button>
-                      <button @click="showTransferDialog(nft.tokenId)" 
-                              class="transfer-btn">
-                        Transfer to Jewelry Company
-                      </button>
-                    </template>
-                    
-                    <template v-if="nft.position === 3">
-                      <button @click="showJewelryDialog(nft.tokenId)" 
-                              class="action-btn">
-                        Fill Jewelry Info
-                      </button>
-                      <button @click="showTransferDialog(nft.tokenId)" 
-                              class="transfer-btn">
-                        Transfer to Designer
-                      </button>
-                    </template>
-                    
-                    <template v-if="nft.position === 4">
-                      <button @click="showDesignerDialog(nft.tokenId)" 
-                              class="action-btn">
-                        Fill Designer Info
-                      </button>
-                      <button @click="showTransferDialog(nft.tokenId)" 
-                              class="transfer-btn">
-                        Transfer to Customer
-                      </button>
-                    </template>
-                    
-                    <template v-if="nft.position >= 5">
-                      <button @click="showCustomerDialog(nft.tokenId)" 
-                              class="action-btn">
-                        Fill Customer Info
-                      </button>
-                      <button @click="showTransferDialog(nft.tokenId)" 
-                              class="transfer-btn">
-                        Transfer to Next Owner
-                      </button>
-                    </template>
-                  </template>
-                </div>
-              </div>
-            </div>
-            <div v-else>
-              <p>You don't own any diamond NFTs yet.</p>
+      <!-- NFT 列表对话框 -->
+      <div v-if="showMyNFTsDialog" class="modal">
+        <div class="modal-content">
+          <span class="close" @click="showMyNFTsDialog = false">&times;</span>
+          <h2>My Diamond NFTs</h2>
+          <div v-if="myNFTs.length > 0">
+            <div v-for="nft in myNFTs" :key="nft.tokenId" class="nft-item">
+              <p>Token ID: {{ nft.tokenId }}</p>
+              <p>Position: {{ nft.position }}</p>
+              <RoleActions 
+                :tokenId="nft.tokenId"
+                :position="nft.position"
+                :owner="nft.owner"
+                :currentAccount="account"
+                @showTransfer="handleShowTransfer"
+                @showCutting="handleShowCutting"
+                @showGrading="handleShowGrading"
+                @showJewelry="handleShowJewelry"
+                @showDesigner="handleShowDesigner"
+                @showCustomer="handleShowCustomer"
+              />
             </div>
           </div>
-        </div>
-
-        <div v-if="showTransferForm" class="modal">
-          <div class="modal-content">
-            <span class="close" @click="closeForm">&times;</span>
-            <h2>Transfer Diamond NFT</h2>
-            <form @submit.prevent="submitTransfer">
-              <div class="form-group">
-                <label>Token ID:</label>
-                <input type="text" v-model="transferForm.tokenId" disabled />
-              </div>
-              <div class="form-group">
-                <label>Recipient Address:</label>
-                <input v-model="transferForm.to" required 
-                       placeholder="Enter recipient's wallet address" />
-              </div>
-              <button type="submit">Transfer NFT</button>
-            </form>
-          </div>
-        </div>
-
-        <div v-if="showDesignerForm" class="modal">
-          <div class="modal-content">
-            <span class="close" @click="closeForm">&times;</span>
-            <h2>Designer Stage</h2>
-            <form @submit.prevent="submitDesigner">
-              <div class="form-group">
-                <label>Token ID:</label>
-                <input type="number" v-model="designerForm.tokenId" required />
-              </div>
-              <div class="form-group">
-                <label>Designer Name:</label>
-                <input v-model="designerForm.designerName" required />
-              </div>
-              <div class="form-group">
-                <label>Design Date:</label>
-                <input type="date" v-model="designerForm.designDate" required />
-              </div>
-              <button type="submit">Submit Designer Info</button>
-            </form>
-          </div>
-        </div>
-
-        <div v-if="showCustomerForm" class="modal">
-          <div class="modal-content">
-            <span class="close" @click="closeForm">&times;</span>
-            <h2>Customer Stage</h2>
-            <form @submit.prevent="submitCustomer">
-              <div class="form-group">
-                <label>Token ID:</label>
-                <input type="number" v-model="customerForm.tokenId" required />
-              </div>
-              <div class="form-group">
-                <label>Customer Name:</label>
-                <input v-model="customerForm.customerName" required />
-              </div>
-              <div class="form-group">
-                <label>Purchase Date:</label>
-                <input type="date" v-model="customerForm.purchaseDate" required />
-              </div>
-              <button type="submit">Submit Customer Info</button>
-            </form>
+          <div v-else>
+            <p>You don't own any diamond NFTs yet.</p>
           </div>
         </div>
       </div>
     </div>
-  </template>
-  
-  <script>
-  import { ethers } from "ethers";
-  import DiomandDapp from "../../artifacts/contracts/DiamondDapp.sol/DiomandDapp.json";
-  
-  export default {
-    name: 'SearchPage',
-    data() {
-      return {
-        tokenId: "",
-        diamond: null,
-        isConnected: false,
-        account: "",
-        contract: null,
-        showMiningForm: false,
-        showCuttingForm: false,
-        showGradingForm: false,
-        showJewelryForm: false,
-        showMyNFTsDialog: false,
-        showTransferForm: false,
-        showDesignerForm: false,
-        showCustomerForm: false,
-        miningForm: {
-          miningCompany: '',
-          location: '',
-          date: ''
-        },
-        cuttingForm: {
-          tokenId: '',
-          cuttingCompany: '',
-          cutDate: '',
-          grade: ''
-        },
-        gradingForm: {
-          tokenId: '',
-          gradingLab: '',
-          engravedID: '',
-          gradingLevel: '',
-          gradingDate: '',
-          qualityReport: ''
-        },
-        jewelryForm: {
-          tokenId: '',
-          jewelryMaker: '',
-          jewelryType: '',
-          possessionDate: ''
-        },
-        designerForm: {
-          tokenId: '',
-          designerName: '',
-          designDate: ''
-        },
-        customerForm: {
-          tokenId: '',
-          customerName: '',
-          purchaseDate: ''
-        },
-        myNFTs: [],
-        transferForm: {
-          tokenId: '',
-          to: ''
-        },
-        selectedTokenId: null
-      };
-    },
-    mounted() {
-      // 检是否已经连接
-      this.checkConnection();
-      // 监听账户变化
-      if (window.ethereum) {
-        window.ethereum.on('accountsChanged', this.handleAccountsChanged);
+  </div>
+</template>
+
+<script>
+/* eslint-disable no-unused-vars */
+import { ref, onMounted } from 'vue';
+import ConnectWallet from './components/ConnectWallet.vue';
+import SearchForm from './components/SearchForm.vue';
+import DiamondDetails from './components/DiamondDetails.vue';
+import RoleActions from './components/RoleActions.vue';
+import MiningForm from './components/forms/MiningForm.vue';
+import CuttingForm from './components/forms/CuttingForm.vue';
+import GradingForm from './components/forms/GradingForm.vue';
+import JewelryForm from './components/forms/JewelryForm.vue';
+import DesignerForm from './components/forms/DesignerForm.vue';
+import CustomerForm from './components/forms/CustomerForm.vue';
+import TransferForm from './components/forms/TransferForm.vue';
+import { useWallet } from './composables/useWallet';
+import { useContract } from './composables/useContract';
+
+export default {
+  name: 'SearchPage',
+  components: {
+    ConnectWallet,
+    SearchForm,
+    DiamondDetails,
+    RoleActions,
+    MiningForm,
+    CuttingForm,
+    GradingForm,
+    JewelryForm,
+    DesignerForm,
+    CustomerForm,
+    TransferForm
+  },
+  setup() {
+    // 使用组合式 API
+    const { isConnected, account, connectWallet } = useWallet();
+    const { contract, initContract, bytesToString, isZeroAddress } = useContract();
+
+    // 状态管理
+    const tokenId = ref('');
+    const diamond = ref(null);
+    const myNFTs = ref([]);
+    const selectedTokenId = ref(null);
+    
+    // 表单显示状态
+    const showMiningForm = ref(false);
+    const showCuttingForm = ref(false);
+    const showGradingForm = ref(false);
+    const showJewelryForm = ref(false);
+    const showDesignerForm = ref(false);
+    const showCustomerForm = ref(false);
+    const showMyNFTsDialog = ref(false);
+
+    // 添加 transfer 相关的状态
+    const showTransferForm = ref(false);
+    const transferFormData = ref({
+      tokenId: '',
+      to: ''
+    });
+
+    // 方法定义
+    async function handleWalletConnected() {
+      try {
+        const signer = await connectWallet();
+        if (!signer) {
+          throw new Error("Failed to get signer");
+        }
+        await initContract(signer);
+        await fetchMyNFTs();
+      } catch (error) {
+        console.error('Wallet connection error:', error);
+        alert(`Failed to initialize: ${error.message}`);
       }
-    },
-    methods: {
-      async checkConnection() {
-        if (window.ethereum) {
-          try {
-            // 获取已连接的账户
-            const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-            if (accounts.length > 0) {
-              this.account = accounts[0];
-              this.isConnected = true;
-              await this.initContract();
-            }
-          } catch (error) {
-            console.error("Error checking connection:", error);
-          }
-        }
-      },
-      async connectWallet() {
-        if (!window.ethereum) {
-          alert("Please install MetaMask!");
-          return;
+    }
+
+    function handleWalletDisconnected() {
+      diamond.value = null;
+      myNFTs.value = [];
+      closeAllForms();
+    }
+
+    async function handleSearch() {
+      try {
+        if (!contract.value) {
+          throw new Error("Contract not initialized");
         }
 
-        try {
-          // 请求用户连接
-          const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-          this.account = accounts[0];
-          this.isConnected = true;
-          
-          // 初始化合约
-          await this.initContract();
-          
-          alert("Wallet connected successfully!");
-        } catch (error) {
-          console.error("Error connecting wallet:", error);
-          alert("Failed to connect wallet");
-        }
-      },
-      handleAccountsChanged(accounts) {
-        if (accounts.length === 0) {
-          // MetaMask 断开连接
-          this.isConnected = false;
-          this.account = "";
-          this.contract = null;
-        } else {
-          // 账户切换
-          this.account = accounts[0];
-        }
-      },
-      async initContract() {
-        try {
-          if (!window.ethereum) {
-            throw new Error("MetaMask is not installed");
-          }
-
-          // 请求换到本地网络
-          try {
-            await window.ethereum.request({
-              method: 'wallet_switchEthereumChain',
-              params: [{ chainId: '0x7A69' }], // 31337 in hex
-            });
-          } catch (switchError) {
-            // 如果网络不在，添加网络
-            if (switchError.code === 4902) {
-              try {
-                await window.ethereum.request({
-                  method: 'wallet_addEthereumChain',
-                  params: [{
-                    chainId: '0x7A69', // 31337 in hex
-                    chainName: 'Localhost 8545',
-                    nativeCurrency: {
-                      name: 'ETH',
-                      symbol: 'ETH',
-                      decimals: 18
-                    },
-                    rpcUrls: ['http://127.0.0.1:8545/']
-                  }]
-                });
-              } catch (addError) {
-                throw new Error("Failed to add the local network");
-              }
-            } else {
-              throw new Error("Failed to switch to the local network");
-            }
-          }
-          
-
-          const provider = new ethers.providers.Web3Provider(window.ethereum);
-          await provider.send("eth_requestAccounts", []); // 请求用户授权
-          const signer = provider.getSigner();
-          
+        const result = await contract.value.getDiamondInfo(tokenId.value);
         
+        // 确保所有 bytes32 类型的数据都被正确转换
+        diamond.value = {
+          miningCompany: bytesToString(result.miningCompany),
+          cuttingCompany: bytesToString(result.cuttingCompany),
+          gradingLab: bytesToString(result.gradingLab),
+          jewelryMaker: bytesToString(result.jewelryMaker),
+          designer: bytesToString(result.designer),
+          customer: bytesToString(result.customer),
+          // ... 其他字段
+        };
+      } catch (error) {
+        console.error('Search error:', error);
+        alert(`Search failed: ${error.message}`);
+      }
+    }
+
+    async function fetchMyNFTs() {
+      try {
+        console.log("Fetching NFTs for account:", account.value);
+        
+        if (!contract.value) {
+          throw new Error("Contract not initialized");
+        }
+
+        const balance = await contract.value.balanceOf(account.value);
+        console.log("NFT balance:", balance.toString());
+        
+        myNFTs.value = [];
+
+        for (let i = 0; i < balance; i++) {
+          const tokenId = await contract.value.tokenOfOwnerByIndex(account.value, i);
+          console.log("Found token ID:", tokenId.toString());
           
-          // 获取当前账户地址
-          const address = await signer.getAddress();
-          console.log("Current account:", address);
-
-          // 使用部署时的址
-          const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-          console.log("Contract address:", contractAddress);
-
-          // 验证合约地址否存在
-          const code = await provider.getCode(contractAddress);
-          console.log("Contract code:", code);
-          if (code === '0x') {
-            throw new Error("No contract found at this address");
-          }
-
-          this.contract = new ethers.Contract(
-            contractAddress,
-            DiomandDapp.abi,
-            signer
-          );
-
-          // 测试合约连接
-          const name = await this.contract.name();
-          console.log("Contract name:", name);
-          console.log("Contract initialized successfully");
-
-        } catch (error) {
-          console.error("Contract initialization error:", error);
-          alert(`Contract initialization failed: ${error.message}`);
-          throw error;
-        }
-      },
-      async searchDiamond() {
-        try {
-          if (!this.isConnected) {
-            alert("Please connect your wallet first!");
-            return;
-          }
-
-          if (this.tokenId === "" || isNaN(this.tokenId) || this.tokenId < 0) {
-            alert("Please enter a valid Token ID");
-            return;
-          }
-
-          if (!this.contract) {
-            await this.initContract();
-          }
-
-          // 首先检查代币是否存在
-          try {
-            await this.contract.ownerOf(this.tokenId);
-          } catch (error) {
-            console.error("Token does not exist:", error);
-            this.diamond = null;
-            alert("该代币ID不存在");
-            return;
-          }
-
-          // 获取所有阶段的详细信息
-          try {
-            const [miningDetails, cuttingDetails, gradingDetails, jewelryDetails, designDetails, customerDetails, position, owner] = 
-              await Promise.all([
-                this.contract.getMiningDetails(this.tokenId),
-                this.contract.getCuttingDetails(this.tokenId),
-                this.contract.getGradingDetails(this.tokenId),
-                this.contract.getJewelryDetails(this.tokenId),
-                this.contract.getDesignDetails(this.tokenId),
-                this.contract.getCustomerDetails(this.tokenId),
-                this.contract.getDiamondPosition(this.tokenId),
-                this.contract.ownerOf(this.tokenId)
-              ]);
-
-            console.log("Raw Mining Details:", miningDetails);
-            console.log("Raw Cutting Details:", cuttingDetails);
-            console.log("Raw Grading Details:", gradingDetails);
-            console.log("Raw Jewelry Details:", jewelryDetails);
-            console.log("Raw Design Details:", designDetails);
-            console.log("Raw Customer Details:", customerDetails);
-
-            // 确保所有数据都存在并且格式正确
-            if (!miningDetails || !cuttingDetails || !gradingDetails || 
-                !jewelryDetails || !designDetails || !customerDetails) {
-              throw new Error("Some data is missing from the contract");
-            }
-
-            // 修改数据结构组织方式，添加数据验证
-            this.diamond = {
-              Mining: {
-                diamondID: this.tokenId,
-                miningCompany: miningDetails[0] ? this.bytesToString(miningDetails[0]) : 'N/A',
-                location: miningDetails[1] ? this.bytesToString(miningDetails[1]) : 'N/A',
-                minedDate: miningDetails[2] ? miningDetails[2].toNumber() : 0,
-                miningAddress: this.isZeroAddress(miningDetails[3]) ? 'N/A' : miningDetails[3]
-              },
-              Cutting: {
-                cuttingCompany: cuttingDetails[0] ? this.bytesToString(cuttingDetails[0]) : 'N/A',
-                cutDate: cuttingDetails[1] ? cuttingDetails[1].toNumber() : 0,
-                cutGrade: cuttingDetails[2] ? this.bytesToString(cuttingDetails[2]) : 'N/A',
-                cuttingAddress: this.isZeroAddress(cuttingDetails[3]) ? 'N/A' : cuttingDetails[3]
-              },
-              grading: {
-                gradingLab: gradingDetails[0] ? this.bytesToString(gradingDetails[0]) : 'N/A',
-                engravedID: gradingDetails[1] ? this.bytesToString(gradingDetails[1]) : 'N/A',
-                grading: gradingDetails[2] ? this.bytesToString(gradingDetails[2]) : 'N/A',
-                gradingDate: gradingDetails[3] ? gradingDetails[3].toNumber() : 0,
-                qualityReport: gradingDetails[4] || 'N/A',
-                gradingAddress: this.isZeroAddress(gradingDetails[5]) ? 'N/A' : gradingDetails[5]
-              },
-              jewelry: {
-                jewelryMaker: jewelryDetails[0] ? this.bytesToString(jewelryDetails[0]) : 'N/A',
-                jewelryType: jewelryDetails[1] ? this.bytesToString(jewelryDetails[1]) : 'N/A',
-                possessionDate: jewelryDetails[2] ? jewelryDetails[2].toNumber() : 0,
-                jewelryAddress: this.isZeroAddress(jewelryDetails[3]) ? 'N/A' : jewelryDetails[3]
-              },
-              design: {
-                designer: designDetails[0] ? this.bytesToString(designDetails[0]) : 'N/A',
-                designDate: designDetails[1] ? designDetails[1].toNumber() : 0,
-                designerAddress: this.isZeroAddress(designDetails[2]) ? 'N/A' : designDetails[2]
-              },
-              customer: {
-                name: customerDetails[0] ? this.bytesToString(customerDetails[0]) : 'N/A',
-                purchaseDate: customerDetails[1] ? customerDetails[1].toNumber() : 0,
-                customerAddress: this.isZeroAddress(customerDetails[2]) ? 'N/A' : customerDetails[2]
-              },
-              position: position.toNumber(),
-              owner: owner
-            };
-
-            console.log("Processed Diamond Data:", this.diamond);
-
-          } catch (error) {
-            console.error("Error processing diamond details:", error);
-            throw new Error("Failed to process diamond details");
-          }
-
-        } catch (error) {
-          console.error("Error fetching diamond details:", error);
-          this.diamond = null;
-          alert(`Error: ${error.message}`);
-        }
-      },
-      getPosition(position) {
-        const stages = ["Mining", "Cutting", "Grading", "Jewelry Making", "Design", "Customer"];
-        return position >= 5 ? "Customer" : stages[position] || "Unknown";
-      },
-      // 修改 isValidDiamondData 方法
-      isValidDiamondData(data) {
-        return data && 
-               data.Mining && 
-               (data.Mining.miningCompany !== 'N/A' || 
-                data.Mining.location !== 'N/A' || 
-                data.Mining.minedDate !== 0);
-      },
-      showMiningDialog() {
-        this.showMiningForm = true;
-      },
-      showCuttingDialog(tokenId) {
-        this.showMyNFTsDialog = false;
-        this.cuttingForm.tokenId = tokenId;
-        this.showCuttingForm = true;
-      },
-      showGradingDialog(tokenId) {
-        this.showMyNFTsDialog = false;
-        this.gradingForm.tokenId = tokenId;
-        this.showGradingForm = true;
-      },
-      showJewelryDialog(tokenId) {
-        this.showMyNFTsDialog = false;
-        this.jewelryForm.tokenId = tokenId;
-        this.showJewelryForm = true;
-      },
-      showTransferDialog(tokenId) {
-        this.showMyNFTsDialog = false;
-        this.transferForm.tokenId = tokenId;
-        this.showTransferForm = true;
-      },
-      //确认diamon的position
-      async checkDiamondPosition(tokenId) {
-    try {
-        const position = await this.contract.position(tokenId);
-        console.log(`Diamond ${tokenId} current position:`, position.toString());
-        return position;
-    } catch (error) {
-        console.error("Error checking position:", error);
-        }
-      },
-
-      // 提交切割信息
-      async submitCutting() {
-        try {
-          if (!this.contract) {
-            await this.initContract();
-          }
-          //检查diamon的position
-          try {
-            const position = await this.checkDiamondPosition(this.cuttingForm.tokenId);
-            if (position.toNumber() !== 1) {
-              alert(`Diamond is not in the Cutting stage. Please check the position.Current position: ${position.toString()}`);
-              return;
-            }
-          } catch (error) {
-            console.error("Error checking position:", error);
-            alert(`Error: ${error.message || "Failed to check diamond position"}`);
-            return;
-          }
-
-          // 将字符串转换为 bytes32
-          const cuttingCompanyBytes32 = ethers.utils.formatBytes32String(this.cuttingForm.cuttingCompany);
-          const gradeBytes32 = ethers.utils.formatBytes32String(this.cuttingForm.grade);
-          const cutDateTimestamp = Math.floor(new Date(this.cuttingForm.cutDate).getTime() / 1000);
-
-          console.log("Cutting parameters:", {
-            tokenId: this.cuttingForm.tokenId,
-            company: cuttingCompanyBytes32,
-            date: cutDateTimestamp,
-            grade: gradeBytes32
+          const position = await contract.value.getDiamondPosition(tokenId);
+          const owner = await contract.value.ownerOf(tokenId);
+          
+          myNFTs.value.push({
+            tokenId: tokenId.toString(),
+            position: position.toNumber(),
+            owner
           });
-
-          const tx = await this.contract.cutting(
-            this.cuttingForm.tokenId,
-            cuttingCompanyBytes32,
-            cutDateTimestamp,
-            gradeBytes32,
-            { gasLimit: 500000 }
-          );
-
-          console.log("Transaction sent:", tx.hash);
-          const receipt = await tx.wait();
-          console.log("Transaction confirmed:", receipt);
-
-          alert('Cutting information submitted successfully!');
-          this.showCuttingForm = false;
-          this.cuttingForm = { tokenId: '', cuttingCompany: '', cutDate: '', grade: '' };
-          await this.fetchMyNFTs();
-
-        } catch (error) {
-          console.error('Error submitting cutting info:', error);
-          alert(`Failed to submit cutting info: ${error.message}`);
         }
-      },
+
+        console.log("Fetched NFTs:", myNFTs.value);
+      } catch (error) {
+        console.error('Error fetching NFTs:', error);
+        alert('Failed to fetch your NFTs: ' + error.message);
+      }
+    }
+
+    // 表单处理方法
+    function showMiningDialog() {
+      showMiningForm.value = true;
+    }
+
+    function handleShowCutting(tokenId) {
+      selectedTokenId.value = tokenId;
+      showCuttingForm.value = true;
+      showMyNFTsDialog.value = false;
+    }
+
+    function handleShowGrading(tokenId) {
+      selectedTokenId.value = tokenId;
+      showGradingForm.value = true;
+      showMyNFTsDialog.value = false;
+    }
+
+    function handleShowJewelry(tokenId) {
+      selectedTokenId.value = tokenId;
+      showJewelryForm.value = true;
+      showMyNFTsDialog.value = false;
+    }
+
+    function handleShowDesigner(tokenId) {
+      selectedTokenId.value = tokenId;
+      showDesignerForm.value = true;
+      showMyNFTsDialog.value = false;
+    }
+
+    function handleShowCustomer(tokenId) {
+      selectedTokenId.value = tokenId;
+      showCustomerForm.value = true;
+      showMyNFTsDialog.value = false;
+    }
+
+    // 成功处理方法
+    async function handleMiningSuccess() {
+      await fetchMyNFTs();
+      showMiningForm.value = false;
+    }
+
+    async function handleCuttingSuccess() {
+      await fetchMyNFTs();
+      showCuttingForm.value = false;
+      showMyNFTsDialog.value = true;
+    }
+
+    async function handleGradingSuccess() {
+      await fetchMyNFTs();
+      showGradingForm.value = false;
+      showMyNFTsDialog.value = true;
+    }
+
+    async function handleJewelrySuccess() {
+      await fetchMyNFTs();
+      showJewelryForm.value = false;
+      showMyNFTsDialog.value = true;
+    }
+
+    async function handleDesignerSuccess() {
+      await fetchMyNFTs();
+      showDesignerForm.value = false;
+      showMyNFTsDialog.value = true;
+    }
+
+    async function handleCustomerSuccess() {
+      await fetchMyNFTs();
+      showCustomerForm.value = false;
+      showMyNFTsDialog.value = true;
+    }
+
+    async function showMyNFTs() {
+      try {
+        await fetchMyNFTs();
+        showMyNFTsDialog.value = true;
+      } catch (error) {
+        console.error('Error showing NFTs:', error);
+        alert('Failed to load NFTs');
+      }
+    }
+
+    function closeForm() {
+      showCuttingForm.value = false;
+      showGradingForm.value = false;
+      showJewelryForm.value = false;
+      showDesignerForm.value = false;
+      showCustomerForm.value = false;
+      showMyNFTsDialog.value = true;
+    }
+
+    function closeAllForms() {
+      showMiningForm.value = false;
+      showCuttingForm.value = false;
+      showGradingForm.value = false;
+      showJewelryForm.value = false;
+      showDesignerForm.value = false;
+      showCustomerForm.value = false;
+      showMyNFTsDialog.value = false;
+    }
+
+    // 添加 transfer 相关的方法
+    function handleShowTransfer(tokenId) {
+      selectedTokenId.value = tokenId;
+      showTransferForm.value = true;
+      showMyNFTsDialog.value = false;
+    }
+
+    async function handleTransferSuccess() {
+      await fetchMyNFTs();
+      showTransferForm.value = false;
+      showMyNFTsDialog.value = true;
+    }
+
+    // 生命周期钩子
+    onMounted(async () => {
+      console.log("Component mounted, waiting for user to connect wallet");
+    });
+
+    return {
+      // 状态
+      isConnected,
+      account,
+      tokenId,
+      diamond,
+      myNFTs,
+      selectedTokenId,
       
-      //提交评级信息
-      async submitGrading() {
-        try {
-          if (!this.contract) {
-            await this.initContract();
-          }
-          // 检查钻石的 position
-          try {
-            const position = await this.checkDiamondPosition(this.gradingForm.tokenId);
-            if (position.toNumber() !== 2) {
-              alert(`Diamond is not in the Grading stage. Current position: ${position.toString()}`);
-              return;
-            }
-          } catch (error) {
-            console.error("Error checking position:", error);
-            alert(`Error: ${error.message || "Failed to check diamond position"}`);
-            return;
-          }
-
-          // 将字符串转换为 bytes32
-          const gradingLabBytes32 = ethers.utils.formatBytes32String(this.gradingForm.gradingLab);
-          const engravedIDBytes32 = ethers.utils.formatBytes32String(this.gradingForm.engravedID);
-          const gradingLevelBytes32 = ethers.utils.formatBytes32String(this.gradingForm.gradingLevel);
-          const gradingDateTimestamp = Math.floor(new Date(this.gradingForm.gradingDate).getTime() / 1000);
-
-          console.log("Submitting grading info:", {
-            tokenId: this.gradingForm.tokenId,
-            gradingLab: gradingLabBytes32,
-            engravedID: engravedIDBytes32,
-            gradingLevel: gradingLevelBytes32,
-            gradingDate: gradingDateTimestamp,
-            qualityReport: this.gradingForm.qualityReport  // 保持为 string
-          });
-
-          const tx = await this.contract.setGradingInfo(
-            this.gradingForm.tokenId,
-            gradingLabBytes32,        // 使用转换后的 bytes32
-            engravedIDBytes32,        // 使用转换后的 bytes32
-            gradingLevelBytes32,      // 使用转换后的 bytes32
-            gradingDateTimestamp,
-            this.gradingForm.qualityReport  // qualityReport 保持为 string
-          );
-
-          await tx.wait();
-          alert('Grading information submitted successfully!');
-          this.showGradingForm = false;
-          this.gradingForm = { tokenId: '', gradingLab: '', engravedID: '', gradingLevel: '', gradingDate: '', qualityReport: '' };
-          await this.fetchMyNFTs();
-        } catch (error) {
-          console.error('Error submitting grading info:', error);
-          alert(`Failed to submit grading info: ${error.message}`);
-        }
-      },
-
-      //提交珠宝商数据
-      async submitJewelry() {
-        try {
-          if (!this.contract) {
-            await this.initContract();
-          }
-
-          // 检查钻石的 position
-          try {
-            const position = await this.checkDiamondPosition(this.jewelryForm.tokenId);
-            if (position.toNumber() !== 3) {
-              alert(`Diamond is not in the Jewelry Making stage. Current position: ${position.toString()}`);
-              return;
-            }
-          } catch (error) {
-            console.error("Error checking position:", error);
-            alert(`Error: ${error.message || "Failed to check diamond position"}`);
-            return;
-          }
-
-          // 将字符串转换为 bytes32
-          const jewelryMakerBytes32 = ethers.utils.formatBytes32String(this.jewelryForm.jewelryMaker);
-          const jewelryTypeBytes32 = ethers.utils.formatBytes32String(this.jewelryForm.jewelryType);
-          const possessionDateTimestamp = Math.floor(new Date(this.jewelryForm.possessionDate).getTime() / 1000);
-
-          console.log("Submitting jewelry info:", {
-            tokenId: this.jewelryForm.tokenId,
-            jewelryMaker: jewelryMakerBytes32,
-            jewelryType: jewelryTypeBytes32,
-            possessionDate: possessionDateTimestamp
-          });
-
-          const tx = await this.contract.jewelryMaking(
-            this.jewelryForm.tokenId,
-            jewelryMakerBytes32,     // 使用转换后的 bytes32
-            jewelryTypeBytes32,      // 使用转换后的 bytes32
-            possessionDateTimestamp
-          );
-
-          await tx.wait();
-          alert('Jewelry making information submitted successfully!');
-          this.showJewelryForm = false;
-          this.jewelryForm = { tokenId: '', jewelryMaker: '', jewelryType: '', possessionDate: '' };
-          await this.fetchMyNFTs();
-        } catch (error) {
-          console.error('Error submitting jewelry info:', error);
-          alert(`Failed to submit jewelry info: ${error.message}`);
-        }
-      },
-      async showMyNFTs() {
-        await this.fetchMyNFTs();
-        this.showMyNFTsDialog = true;
-      },
-      // 获取我的NFTs
-      async fetchMyNFTs() {
-        try {
-          if (!this.contract) {
-            await this.initContract();
-          }
-
-          const balance = await this.contract.balanceOf(this.account);
-          this.myNFTs = [];
-
-          for (let i = 0; i < balance; i++) {
-            const tokenId = await this.contract.tokenOfOwnerByIndex(this.account, i);
-            const miningDetails = await this.contract.getMiningDetails(tokenId);
-            const cuttingDetails = await this.contract.getCuttingDetails(tokenId);
-            const position = await this.contract.getDiamondPosition(tokenId);
-            const owner = await this.contract.ownerOf(tokenId);
-
-            this.myNFTs.push({
-              tokenId: tokenId.toString(),
-              diamondID: miningDetails[4],
-              miningCompany: this.bytesToString(miningDetails[0]),
-              location: this.bytesToString(miningDetails[1]),
-              minedDate: this.formatDate(miningDetails[2].toNumber()),
-              cuttingCompany: this.bytesToString(cuttingDetails[0]),
-              cutDate: this.formatDate(cuttingDetails[1].toNumber()),
-              grade: this.bytesToString(cuttingDetails[2]),
-              position: position.toNumber(),
-              owner: owner
-            });
-          }
-        } catch (error) {
-          console.error('Error fetching NFTs:', error);
-          alert('Failed to fetch your NFTs');
-        }
-      },
-      // 修改 formatDate 方法
-      formatDate(timestamp) {
-        if (!timestamp || timestamp === 0) return 'N/A';
-        try {
-          return new Date(timestamp * 1000).toLocaleDateString();
-        } catch (error) {
-          console.warn('格式化日期时出错:', error);
-          return 'N/A';
-        }
-      },
-
-      // 提交铸造信息
-      async mintDiamond() {
-        try {
-          if (!this.contract) {
-            await this.initContract();
-          }
-
-          // 检查输入值是否为空
-          if (!this.miningForm.miningCompany || !this.miningForm.location || !this.miningForm.date) {
-            alert("请填写所有必填字段");
-            return;
-          }
-
-          // 将字符串转换为 bytes32 格式
-          const miningCompanyBytes32 = ethers.utils.formatBytes32String(this.miningForm.miningCompany);
-          const locationBytes32 = ethers.utils.formatBytes32String(this.miningForm.location);
-          
-          // 转换日期为时间戳
-          const dateTimestamp = Math.floor(new Date(this.miningForm.date).getTime() / 1000);
-
-          console.log("Mining parameters:", {
-            company: miningCompanyBytes32,
-            location: locationBytes32,
-            date: dateTimestamp
-          });
-
-          // 调用合约方法
-          const tx = await this.contract.mining(
-            miningCompanyBytes32,
-            locationBytes32,
-            dateTimestamp,
-            // { gasLimit: 500000 } // 添加 gas 限制
-          );
-
-          console.log("Transaction sent:", tx.hash);
-          const receipt = await tx.wait();
-          console.log("Transaction confirmed:", receipt);
-
-          // 显示成功消息
-          alert('Diamond NFT minted successfully!');
-          
-          // 关闭表单
-          this.showMiningForm = false;
-          
-          // 清空表单数据
-          this.miningForm = {
-            miningCompany: '',
-            location: '',
-            date: ''
-          };
-
-          // 刷新 NFT 列表
-          await this.fetchMyNFTs();
-
-        } catch (error) {
-          console.error('Error minting diamond:', error);
-          alert(`Failed to mint diamond: ${error.message}`);
-        }
-      },
-      //转移NFT操作
-      async submitTransfer() {
-        try {
-          if (!this.contract) {
-            await this.initContract();
-          }
-
-          // 检查地址格式
-          if (!ethers.utils.isAddress(this.transferForm.to)) {
-            alert("请输入有效的以太坊地址");
-            return;
-          }
-
-          // 检查是否是当前 NFT 的所有者
-          try {
-            const owner = await this.contract.ownerOf(this.transferForm.tokenId);
-            if (owner.toLowerCase() !== this.account.toLowerCase()) {
-              alert("你不是这个钻石 NFT 的所有者，无法进行转移操作");
-              return;
-            }
-          } catch (error) {
-            console.error("Error checking ownership:", error);
-            alert("检查所有权时出错");
-            return;
-          }
-
-          console.log("Transfer parameters:", {
-            tokenId: this.transferForm.tokenId,
-            to: this.transferForm.to
-          });
-
-          const tx = await this.contract.transit(
-            this.transferForm.tokenId,
-            this.transferForm.to
-          );
-
-          console.log("Transaction sent:", tx.hash);
-          const receipt = await tx.wait();
-          console.log("Transaction confirmed:", receipt);
-
-          alert('NFT transferred successfully!');
-          this.showTransferForm = false;
-          this.transferForm = { tokenId: '', to: '' };
-          await this.fetchMyNFTs();
-
-        } catch (error) {
-          console.error('Error transferring NFT:', error);
-          
-          // 处理特定的错误信息
-          if (error.message.includes("You don't own the diamond now")) {
-            alert("You don't own the diamond now");
-          } else if (error.message.includes("cannot estimate gas")) {
-            alert("The transaction may fail, please check if you are the owner of the NFT");
-          } else {
-            alert(`Failed to transfer NFT: ${error.message}`);
-          }
-        }
-      },
-
-      // 检查是否是原始所有者（铸造者）
-      async isOriginalOwner(tokenId) {
-        try {
-          const mintingHistory = await this.contract.getBasicDetails(tokenId);
-          // 假设 miningCompany 是由原始所有者设置的
-          return mintingHistory[0] !== '';
-        } catch (error) {
-          console.error('Error checking original owner:', error);
-          return false;
-        }
-      },
-
-      // 修改 getStageStatus 方法
-      getStageStatus(position, stage, data) {
-        // 首先检查 data 是否存在
-        if (!data) {
-          return 'Unknown';
-        }
-
-        // 如果是客户阶段（stage 5）且当前位置大于等于5
-        if (stage === 5 && position >= 5) {
-          return 'In Progress';
-        }
-
-        // 如果当前位置小于该阶段
-        if (position < stage) {
-          return 'Not Started';
-        }
-
-        // 如果当前位置大于该阶段，说明该阶段已完成
-        if (position > stage) {
-          // 检查该阶段是否有数据
-          switch(stage) {
-            case 0: // Mining
-              return data.Mining && data.Mining.miningCompany && data.Mining.miningCompany !== 'N/A' 
-                ? 'Completed' 
-                : 'Incomplete';
-            case 1: // Cutting
-              return data.Cutting && data.Cutting.cuttingCompany && data.Cutting.cuttingCompany !== 'N/A' 
-                ? 'Completed' 
-                : 'Incomplete';
-            case 2: // Grading
-              return data.grading && data.grading.gradingLab && data.grading.gradingLab !== 'N/A' 
-                ? 'Completed' 
-                : 'Incomplete';
-            case 3: // Jewelry
-              return data.jewelry && data.jewelry.jewelryMaker && data.jewelry.jewelryMaker !== 'N/A' 
-                ? 'Completed' 
-                : 'Incomplete';
-            case 4: // Design
-              return data.design && data.design.designer && data.design.designer !== 'N/A' 
-                ? 'Completed' 
-                : 'Incomplete';
-            case 5: // Customer
-              return data.customer && data.customer.name && data.customer.name !== 'N/A' 
-                ? 'Completed' 
-                : 'Incomplete';
-            default:
-              return 'Unknown';
-          }
-        }
-
-        // 如果当前位置等于该阶段
-        return 'In Progress';
-      },
-      isStageCompleted(nft, stage) {
-        switch(stage) {
-          case 0: // Mining
-            return nft.miningCompany !== '';
-          case 1: // Cutting
-            return nft.cuttingCompany !== '';
-          case 2: // Grading
-            return nft.gradingLab !== '';
-          case 3: // Jewelry
-            return nft.jewelryMaker !== '';
-          default:
-            return false;
-        }
-      },
-      closeForm() {
-        this.showCuttingForm = false;
-        this.showGradingForm = false;
-        this.showJewelryForm = false;
-        this.showTransferForm = false;
-        this.showMyNFTsDialog = true;
-      },
-
-      // 提交设计者信息
-      async submitDesigner() {
-        try {
-          if (!this.contract) {
-            await this.initContract();
-          }
-
-          // 检查钻石的 position
-          try {
-            const position = await this.checkDiamondPosition(this.designerForm.tokenId);
-            if (position.toNumber() !== 4) {
-              alert(`Diamond is not in the Design stage. Current position: ${position.toString()}`);
-              return;
-            }
-          } catch (error) {
-            console.error("Error checking position:", error);
-            alert(`Error: ${error.message || "Failed to check diamond position"}`);
-            return;
-          }
-
-          // 将字符串转换为 bytes32
-          const designerNameBytes32 = ethers.utils.formatBytes32String(this.designerForm.designerName);
-          const designDateTimestamp = Math.floor(new Date(this.designerForm.designDate).getTime() / 1000);
-
-          console.log("Submitting designer info:", {
-            tokenId: this.designerForm.tokenId,
-            designerName: designerNameBytes32,
-            designDate: designDateTimestamp
-          });
-
-          const tx = await this.contract.setDesigner(
-            this.designerForm.tokenId,
-            designerNameBytes32,     // 使用转换后的 bytes32
-            designDateTimestamp
-          );
-
-          await tx.wait();
-          alert('Designer information submitted successfully!');
-          this.showDesignerForm = false;
-          this.designerForm = { tokenId: '', designerName: '', designDate: '' };
-          await this.fetchMyNFTs();
-        } catch (error) {
-          console.error('Error submitting designer info:', error);
-          alert(`Failed to submit designer info: ${error.message}`);
-        }
-      },
-      //提交顾客信息
-      async submitCustomer() {
-        try {
-          if (!this.contract) {
-            await this.initContract();
-          }
-
-          // 检查钻石的 position
-          try {
-            const position = await this.checkDiamondPosition(this.customerForm.tokenId);
-            if (position.toNumber() < 5) {
-              alert(`Diamond is not in the Customer stage. Current position: ${position.toString()}`);
-              return;
-            }
-          } catch (error) {
-            console.error("Error checking position:", error);
-            alert(`Error: ${error.message || "Failed to check diamond position"}`);
-            return;
-          }
-
-          // 将字符串转换为 bytes32
-          const customerNameBytes32 = ethers.utils.formatBytes32String(this.customerForm.customerName);
-          const purchaseDateTimestamp = Math.floor(new Date(this.customerForm.purchaseDate).getTime() / 1000);
-
-          console.log("Submitting customer info:", {
-            tokenId: this.customerForm.tokenId,
-            customerName: customerNameBytes32,
-            purchaseDate: purchaseDateTimestamp
-          });
-
-          const tx = await this.contract.setCustomer(
-            this.customerForm.tokenId,
-            customerNameBytes32,      // 使用转换后的 bytes32
-            purchaseDateTimestamp
-          );
-
-          await tx.wait();
-          alert('Customer information submitted successfully!');
-          this.showCustomerForm = false;
-          this.customerForm = { tokenId: '', customerName: '', purchaseDate: '' };
-          await this.fetchMyNFTs();
-        } catch (error) {
-          console.error('Error submitting customer info:', error);
-          alert(`Failed to submit customer info: ${error.message}`);
-        }
-      },
-      showDesignerDialog(tokenId) {
-        this.showMyNFTsDialog = false;
-        this.designerForm.tokenId = tokenId;
-        this.showDesignerForm = true;
-      },
-      showCustomerDialog(tokenId) {
-        this.showMyNFTsDialog = false;
-        this.customerForm.tokenId = tokenId;
-        this.showCustomerForm = true;
-      },
-      // 修改 bytesToString 方法
-      bytesToString(bytes32) {
-        if (!bytes32) return 'N/A';
-        try {
-          const string = ethers.utils.parseBytes32String(bytes32);
-          return string === '' ? 'N/A' : string;
-        } catch (error) {
-          console.warn('Error parsing bytes32 to string:', error);
-          return 'Invalid Data';
-        }
-      },
-      // 添加检查零地址的辅助方法
-      isZeroAddress(address) {
-        return !address || address === '0x0000000000000000000000000000000000000000';
-      }
-    },
-    beforeUnmount() {
-      // 清理事件监听
-      if (window.ethereum) {
-        window.ethereum.removeListener('accountsChanged', this.handleAccountsChanged);
-      }
-    }
-  };
-  </script>
-  
-  <style scoped>
-  .search {
-    max-width: 800px;  /* 增加最大宽度 */
-    margin: 20px auto;
-    padding: 0 20px;
-    text-align: center;
+      // 表单状态
+      showMiningForm,
+      showCuttingForm,
+      showGradingForm,
+      showJewelryForm,
+      showDesignerForm,
+      showCustomerForm,
+      showMyNFTsDialog,
+      
+      // 方法
+      handleWalletConnected,
+      handleWalletDisconnected,
+      handleSearch,
+      showMiningDialog,
+      handleShowCutting,
+      handleShowGrading,
+      handleShowJewelry,
+      handleShowDesigner,
+      handleShowCustomer,
+      handleMiningSuccess,
+      handleCuttingSuccess,
+      handleGradingSuccess,
+      handleJewelrySuccess,
+      handleDesignerSuccess,
+      handleCustomerSuccess,
+      showMyNFTs,
+      closeForm,
+      closeAllForms,
+      bytesToString,
+      isZeroAddress,
+      showTransferForm,
+      transferFormData,
+      handleShowTransfer,
+      handleTransferSuccess
+    };
   }
-  
-  /* 搜索结果容器 */
-  .search-results {
-    margin-top: 20px;
-    text-align: left;
-    background-color: #f9f9f9;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  }
-  
-  /* 阶段标题 */
-  h2 {
-    color: #2c3e50;
-    border-bottom: 2px solid #4CAF50;
-    padding-bottom: 10px;
-    margin-top: 30px;
-  }
-  
-  /* 列样式 */
-  ul {
-    list-style: none;
-    padding: 0;
-    margin: 15px 0;
-  }
-  
-  li {
-    padding: 8px 0;
-    border-bottom: 1px solid #eee;
-  }
-  
-  li strong {
-    color: #2c3e50;
-    margin-right: 10px;
-  }
-  
-  /* 输入框和按钮 */
-  .search-section {
-    margin: 20px 0;
-  }
-  
-  .search-section input {
-    padding: 10px;
-    font-size: 16px;
-    width: 200px;
-    margin-right: 10px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-  }
-  
-  .search-section button {
-    padding: 10px 20px;
-    font-size: 16px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-  
-  /* 操作按钮 */
-  .action-buttons {
-    margin: 20px 0;
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-  }
-  
-  .action-btn, .my-nfts-btn {
-    padding: 10px 20px;
-    font-size: 16px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-  
-  .action-btn:hover, .my-nfts-btn:hover {
-    background-color: #45a049;
-  }
-  
-  /* 连接钱包部分 */
-  .connect-wallet {
-    margin: 20px 0;
-  }
-  
-  .connect-wallet button {
-    padding: 10px 20px;
-    font-size: 16px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-  
-  /* 模态框样式 */
-  .modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0,0,0,0.5);
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    overflow-y: auto;
-    padding: 20px 0;
-    z-index: 1000;
-  }
-  
-  .modal-content {
-    background-color: white;
-    padding: 20px;
-    border-radius: 8px;
-    width: 90%;
-    max-width: 500px;
-    position: relative;
-    margin: 20px auto;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  }
-  
-  /* 关闭按钮样式 */
-  .close {
-    position: absolute;
-    right: 15px;
-    top: 10px;
-    font-size: 24px;
-    cursor: pointer;
-    color: #666;
-    z-index: 2;
-  }
-  
-  .close:hover {
-    color: #000;
-  }
-  
-  /* NFT 列表项样式 */
-  .nft-item {
-    background-color: white;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 15px;
-    margin: 15px 0;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  }
-  
-  .nft-item h3 {
-    margin: 0 0 10px 0;
-    color: #2c3e50;
-  }
-  
-  .nft-item p {
-    margin: 5px 0;
-    color: #666;
-  }
-  
-  /* 错误消息样式 */
-  .error-message {
-    color: #ff4444;
-    margin: 20px 0;
-    padding: 10px;
-    background-color: #ffebee;
-    border-radius: 4px;
-  }
-  
-  /* 表单样式 */
-  .form-group {
-    margin: 15px 0;
-    text-align: left;
-  }
-  
-  .form-group label {
-    display: block;
-    margin-bottom: 5px;
-    color: #2c3e50;
-  }
-  
-  .form-group input {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-  }
-  
-  /* 响应式设计 */
-  @media (max-width: 600px) {
-    .search {
-      padding: 0 10px;
-    }
-  
-    .search-section input {
-      width: 100%;
-      margin-bottom: 10px;
-    }
-  
-    .action-buttons {
-      flex-direction: column;
-      gap: 10px;
-    }
-  
-    .modal-content {
-      width: 95%;
-      margin: 10px;
-    }
-  }
-  
-  .nft-actions {
-    margin-top: 15px;
-    display: flex;
-    gap: 10px;
-    justify-content: center;
-  }
-  
-  .action-btn {
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-  
-  .transfer-btn {
-    background-color: #2196F3;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-  
-  .action-btn:hover {
-    background-color: #45a049;
-  }
-  
-  .transfer-btn:hover {
-    background-color: #1976D2;
-  }
-  </style>
+};
+</script>
+
+<style scoped>
+.search {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+h1 {
+  color: #2c3e50;
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.action-btn, .my-nfts-btn {
+  padding: 10px 20px;
+  font-size: 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.action-btn {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.my-nfts-btn {
+  background-color: #2196F3;
+  color: white;
+}
+
+.action-btn:hover {
+  background-color: #45a049;
+}
+
+.my-nfts-btn:hover {
+  background-color: #1976D2;
+}
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  overflow-y: auto;
+  padding: 20px 0;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 600px;
+  position: relative;
+  margin: 20px auto;
+}
+
+.close {
+  position: absolute;
+  right: 15px;
+  top: 10px;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+}
+
+.nft-item {
+  margin: 15px 0;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+}
+
+button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+</style>
   
