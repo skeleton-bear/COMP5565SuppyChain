@@ -12,8 +12,8 @@ A blockchain-based diamond NFT tracking system built on Ethereum, designed to re
 1. Clone the repository
 
 ```
-git clone [your-github-repo-url]
-cd diamond-nft-dapp
+git clone https://github.com/skeleton-bear/COMP5565SuppyChain.git
+cd COMP5565SuppyChain
 ```
 
 2. Install dependencies
