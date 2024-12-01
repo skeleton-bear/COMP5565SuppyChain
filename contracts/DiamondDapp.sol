@@ -6,42 +6,47 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 contract DiomandDapp is ERC721Enumerable {
     uint256 public tokenIds;
 
-    // 每个阶段的相关信息
+    // Information for each stage
     mapping(uint256 => uint256) public diamondID;
-    mapping(uint256 => uint256) public position; // 0: 采矿, 1: 切割, 2: 评级, 3: 珠宝商，4: 设计，5：客户
-    // 采矿阶段
+    mapping(uint256 => uint256) public position; // 0: Mining, 1: Cutting, 2: Grading, 3: Jewelry Making, 4: Design, 5: Customer
+    
+    // Mining stage
     mapping(uint256 => bytes32) public miningCompany;
     mapping(uint256 => bytes32) public location;
     mapping(uint256 => uint256) public minedDate;
-    // 切割阶段
+    
+    // Cutting stage
     mapping(uint256 => bytes32) public cuttingCompany;
     mapping(uint256 => bytes32) public cutGrade;
     mapping(uint256 => uint256) public cutDate;
     
-    // 评级阶段
+    // Grading stage
     mapping(uint256 => bytes32) public gradingLab;
     mapping(uint256 => bytes32) public grading;
     mapping(uint256 => bytes32) public engravedID;
     mapping(uint256 => uint256) public gradingDate;
     mapping(uint256 => string) public qualityReport;
-    // 珠宝制作阶段
+    
+    // Jewelry making stage
     mapping(uint256 => bytes32) public jewelryMaker;
     mapping(uint256 => bytes32) public jewelryType;
     mapping(uint256 => uint256) public possessionDate;
-    // 设计阶段
+    
+    // Design stage
     mapping(uint256 => bytes32) public designer;
     mapping(uint256 => uint256) public designDate;
+    mapping(uint256 => uint256) public designPrice;
     
-    // 客户阶段
+    // Customer stage
     mapping(uint256 => bytes32) public customer;
 
-    // 添加新的映射来存储每个阶段的操作者地址
-    mapping(uint256 => address) public miningAddress;    // 采矿公司地址
-    mapping(uint256 => address) public cuttingAddress;   // 切割公司地址
-    mapping(uint256 => address) public gradingAddress;   // 评级机构地址
-    mapping(uint256 => address) public jewelryAddress;   // 珠宝商地址
-    mapping(uint256 => address) public designerAddress;  // 设计师地址
-    mapping(uint256 => address) public customerAddress;  // 客户地址
+    // Add new mappings to store operator addresses for each stage
+    mapping(uint256 => address) public miningAddress;    // Mining company address
+    mapping(uint256 => address) public cuttingAddress;   // Cutting company address
+    mapping(uint256 => address) public gradingAddress;   // Grading lab address
+    mapping(uint256 => address) public jewelryAddress;   // Jewelry maker address
+    mapping(uint256 => address) public designerAddress;  // Designer address
+    mapping(uint256 => address) public customerAddress;  // Customer address
 
     modifier onlyDiamondOwner(uint256 token_id) {
         require(
@@ -52,40 +57,41 @@ contract DiomandDapp is ERC721Enumerable {
     }
 
     modifier onlyAtPosition(uint256 token_id, uint256 requiredPosition) {
-        // 如果当前位置等于要求位置，直接通过
+        // If current position equals required position, pass directly
         if (position[token_id] == requiredPosition) {
             _;
             return;
         }
         
-        // 如果当前位置大于要求位置且大于等于5，也通过
+        // If current position is greater than required position and >= 5, also pass
         if (position[token_id] > requiredPosition && position[token_id] >= 5) {
             _;
             return;
         }
         
-        // 其他情况都不满足
+        // All other cases fail
         revert("You can't perform this operation at this position");
     }
 
     constructor() ERC721("Diomand Supplychain", "DS") {}
 
-    // 采矿操作
+    // Mining operation
     function mining(
         bytes32 mining_company,
         bytes32 loc,
         uint256 date
     ) public payable onlyAtPosition(tokenIds, 0) {
+        require(msg.value == 0.03 ether, "You must pay 0.03 ETH to mint a diamond");   
         _safeMint(msg.sender, tokenIds);
         miningCompany[tokenIds] = mining_company;
         location[tokenIds] = loc;
         minedDate[tokenIds] = date;
-        position[tokenIds] = 0; // 采矿阶段
-        miningAddress[tokenIds] = msg.sender;  // 记录采矿公司地址
+        position[tokenIds] = 0; // Mining stage
+        miningAddress[tokenIds] = msg.sender;  // Record mining company address
         tokenIds += 1;
     }
 
-    // 转移钻石到下一个环节
+    // Transfer diamond to next stage
     function transit(
         uint256 token_id,
         address nextStop
@@ -94,7 +100,7 @@ contract DiomandDapp is ERC721Enumerable {
         position[token_id] += 1;
     }
 
-    // 切割操作，只有在采矿完后才允许
+    // Cutting operation, only allowed after mining
     function cutting(
         uint256 token_id,
         bytes32 cutting_company,
@@ -105,10 +111,10 @@ contract DiomandDapp is ERC721Enumerable {
         cutDate[token_id] = cut_date;
         cutGrade[token_id] = grade;
         position[token_id] = 1;
-        cuttingAddress[token_id] = msg.sender;  // 记录切割公司地址
+        cuttingAddress[token_id] = msg.sender;  // Record cutting company address
     }
 
-    // 加工质量控制操作，只有在切割完成后才允许
+    // Grading operation, only allowed after cutting
     function setGradingInfo(
         uint256 token_id,
         bytes32 gradingLabParam,
@@ -123,10 +129,10 @@ contract DiomandDapp is ERC721Enumerable {
         gradingDate[token_id] = gradingDateParam;
         qualityReport[token_id] = qualityReportParam;
         position[token_id] = 2;
-        gradingAddress[token_id] = msg.sender;  // 记录评级机构地址
+        gradingAddress[token_id] = msg.sender;  // Record grading lab address
     }
 
-    // 设置珠宝商操作，只有在质量控制完成后才允许
+    // Jewelry making operation, only allowed after grading
     function jewelryMaking(
         uint256 token_id,
         bytes32 jewelry_maker,
@@ -137,22 +143,24 @@ contract DiomandDapp is ERC721Enumerable {
         jewelryType[token_id] = jewelryTypeParam;
         possessionDate[token_id] = possessionDateParam;
         position[token_id] = 3;
-        jewelryAddress[token_id] = msg.sender;  // 记录珠宝商地址
+        jewelryAddress[token_id] = msg.sender;  // Record jewelry maker address
     }
 
-     // 设置设计师信息
+     // Set designer information
     function setDesigner(
         uint256 token_id,
         bytes32 designer_name,
-        uint256 design_date
+        uint256 design_date,
+        uint256 design_price
     ) public onlyAtPosition(token_id, 4) onlyDiamondOwner(token_id) {
         designer[token_id] = designer_name;
         designDate[token_id] = design_date;
+        designPrice[token_id] = design_price;
         position[token_id] = 4;
-        designerAddress[token_id] = msg.sender;  // 记录设计师地址
+        designerAddress[token_id] = msg.sender;  // Record designer address
     }
 
-    // 设置客户信息
+    // Set customer information
     function setCustomer(
         uint256 token_id,
         bytes32 customer_name,
@@ -161,10 +169,10 @@ contract DiomandDapp is ERC721Enumerable {
         customer[token_id] = customer_name;
         possessionDate[token_id] = purchase_date;
         position[token_id] = 5;
-        customerAddress[token_id] = msg.sender;  // 记录客户地址
+        customerAddress[token_id] = msg.sender;  // Record customer address
     }
 
-    // 获取采矿阶段信息
+    // Get mining stage information
     function getMiningDetails(
         uint256 token_id
     ) public view returns (
@@ -183,7 +191,7 @@ contract DiomandDapp is ERC721Enumerable {
         );
     }
 
-    // 获取切割阶段信息
+    // Get cutting stage information
     function getCuttingDetails(
         uint256 token_id
     ) public view returns (
@@ -200,7 +208,7 @@ contract DiomandDapp is ERC721Enumerable {
         );
     }
 
-    // 获取钻石的评级相关信息
+    // Get grading stage information
     function getGradingDetails(
         uint256 token_id
     ) public view returns (
@@ -221,7 +229,7 @@ contract DiomandDapp is ERC721Enumerable {
         );
     }
 
-    // 获取珠宝制作相关信息
+    // Get jewelry making stage information
     function getJewelryDetails(
         uint256 token_id
     ) public view returns (
@@ -238,29 +246,31 @@ contract DiomandDapp is ERC721Enumerable {
         );
     }
 
-    // 获取设计相关信息
+    // Get design stage information
     function getDesignDetails(
         uint256 token_id
     ) public view returns (
         bytes32 _designer,
         uint256 _designDate,
+        uint256 _designPrice,
         address _designerAddress
     ) {
         return (
             designer[token_id],
             designDate[token_id],
+            designPrice[token_id],
             designerAddress[token_id]
         );
     }
 
-    // 获取钻石生命周期阶段
+    // Get diamond lifecycle stage
     function getDiamondPosition(
         uint256 token_id
     ) public view returns (uint256) {
         return position[token_id];
     }
 
-    // 添加获取客户信息的函数
+    // Get customer information
     function getCustomerDetails(
         uint256 token_id
     ) public view returns (

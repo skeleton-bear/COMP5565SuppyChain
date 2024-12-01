@@ -1,7 +1,7 @@
 <template>
     <div id="app">
       <div class="container">
-        <h2>Connect MetaMask</h2>
+        <h2>Connect MetaMask1</h2>
         <button @click="connectMetaMask" :disabled="isConnected">Connect with MetaMask</button>
         <p v-if="account">Connected Account: {{ account }}</p>
         <p v-else>Please connect your MetaMask wallet.</p>
